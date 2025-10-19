@@ -245,7 +245,6 @@ export async function listMessages(req: Request & { userId?: string }, res: Resp
     next(err);
   }
 }
-
 export async function sendMessage(req: Request & { userId?: string }, res: Response, next: NextFunction) {
   try {
     const { chatId, type, text, imageUrl, sha256, signature } = sendMessageSchema.parse(req.body);
@@ -269,20 +268,19 @@ export async function sendMessage(req: Request & { userId?: string }, res: Respo
         chatId,
         authorId: userId,
         type,
-        text: type === "TEXT" ? text ?? "" : null,
+        text: type === "TEXT" ? (text ?? "") : null, // texto cifrado (E2E)
         imageUrl: type === "IMAGE" ? imageUrl ?? "" : null,
         sha256: sha256 ?? null,
         signature: signature ?? null,
       },
-      select: {
-        id: true, chatId: true, authorId: true, type: true,
-        text: true, imageUrl: true, sha256: true, signature: true,
-        createdAt: true, editedAt: true, deletedAt: true,
-      },
     });
 
-    await prisma.chat.update({ where: { id: chatId }, data: { lastMessageAt: msg.createdAt } });
+    await prisma.chat.update({
+      where: { id: chatId },
+      data: { lastMessageAt: msg.createdAt },
+    });
 
+    // opcionalmente emite pelo socket
     try {
       const io = getIO();
       io.to(room(chatId)).emit("message:new", msg);
@@ -292,7 +290,4 @@ export async function sendMessage(req: Request & { userId?: string }, res: Respo
   } catch (err) {
     next(err);
   }
-
-
-  
 }

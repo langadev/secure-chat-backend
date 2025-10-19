@@ -4,6 +4,7 @@ import * as userCtrl from "../controllers/user.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import chats from "./chat.routes.js";
 import keysRoutes from "./keys.routes.js";
+import uploadRoutes from "./upload.routes.js";
 const router = Router();
 
 router.get("/health", (_req, res) => res.json({ ok: true }));
@@ -11,6 +12,8 @@ router.get("/health", (_req, res) => res.json({ ok: true }));
 router.use("/auth", authRoutes);
 router.use("/chat", chats);
 router.use("/keys", keysRoutes);
+router.use("/upload", uploadRoutes);
+
 
 // Exemplo: proteger rotas de users
 router.get("/users", requireAuth, userCtrl.list);

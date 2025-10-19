@@ -21,7 +21,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api", routes);
-
+app.use("/uploads", express.static("uploads"));
 // Error handler
 app.use(
   (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
