@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+// ======================
+// MODELOS PRINCIPAIS
+// ======================
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  password     String?
+  role         UserRole  @default(USER)
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // 🔐 Chave pública RSA do utilizador (PEM)
+  publicKeyPem String?   @db.Text
+
+  // Relações
+  chats          ChatParticipant[]
+  messages       Message[]       @relation("MessageAuthor")
+  createdChats   Chat[]          @relation("ChatsCreated")
+  refreshTokens  RefreshToken[]
+  chatKeys       ChatKey[]
+
+  @@index([email])
+}
+
+// ======================
+// CHAT
+// ======================
+
+model Chat {
+  id            String    @id @default(cuid())
+  title         String?
+  isGroup       Boolean   @default(false)
+  createdById   String
+  createdBy     User      @relation("ChatsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime? @db.Timestamptz(6)
+
+  participants  ChatParticipant[]
+  messages      Message[]
+  chatKeys      ChatKey[]
+
+  @@index([lastMessageAt])
+}
+
+// ======================
+// PARTICIPANTES DO CHAT
+// ======================
+
+model ChatParticipant {
+  id        String   @id @default(cuid())
+  chatId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+   isTyping   Boolean   @default(false) // ✅ ADICIONA ESTA LINHA
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+// ======================
+// TROCA DE CHAVES (E2E)
+// ======================
+
+model ChatKey {
+  id           String   @id @default(cuid())
+  chatId       String
+  userId       String
+  // AES-256 cifrada com RSA pública do utilizador (Base64)
+  encAesKeyB64 String
+  createdAt    DateTime @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+// ======================
+// MENSAGENS
+// ======================
+
+model Message {
+  id         String       @id @default(cuid())
+  chatId     String
+  authorId   String
+  type       MessageType  @default(TEXT)
+  text       String?
+  imageUrl   String?
+  iv         String?      // IV do AES-GCM
+  sha256     String?      // Hash da mensagem
+  signature  String?      // Assinatura RSA PSS
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  editedAt   DateTime?
+  deletedAt  DateTime?
+
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  author User @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+  @@index([authorId])
+}
+
+// ======================
+// TOKENS DE REFRESH
+// ======================
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash  String?   // 👈 novo campo
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
